@@ -8,15 +8,11 @@ set -e
 DO_FIRST_STAGE=: # false   # required (unpack phase/ executes outside guest invironment)
 DO_SECOND_STAGE=: # false  # required (complete the install/ executes inside guest invironment)
 DO_THIRD_STAGE=: # false   # optional (enable local policies/ executes inside guest invironment)
-DEBIAN_ROOT_INSTALLPATH=$HOME # IF YOU ARE NOT ROOTED DON'T SET THIS OUTSIDE 
-OF 
-THE TERMUX APP DATA DIRECTORY
+DEBIAN_ROOT_INSTALLPATH=$HOME # IF YOU ARE NOT ROOTED DON'T SET THIS OUTSIDE OF THE TERMUX APP DATA DIRECTORY
 USE_ROOT=: # run this as root to avoid permission problems if using a path outside the termux app data path
 /
-MNEMONIC_USER="" # put something in this string if you want user name to make 
-sense and be an equivalent id to what the first user set up by the debian installer would be.
-USER_PASSWORD="" # put something in this to make the user have a password. 
-POC
+MNEMONIC_USER="" # put something in this string if you want user name to make sense and be an equivalent id to what the first user set up by the debian installer would be.
+USER_PASSWORD="" # put something in this to make the user have a password. POC
 
 [ ! $USER = root ] && USE_ROOT && {
 	pkg install -y tsu
