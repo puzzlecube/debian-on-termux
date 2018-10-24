@@ -8,6 +8,16 @@ set -e
 DO_FIRST_STAGE=: # false   # required (unpack phase/ executes outside guest invironment)
 DO_SECOND_STAGE=: # false  # required (complete the install/ executes inside guest invironment)
 DO_THIRD_STAGE=: # false   # optional (enable local policies/ executes inside guest invironment)
+$DEBIAN_ROOT_INSTALLPATH=$HOME # IF YOU ARE NOT ROOTED DON'T SET THIS OUTSIDE OF THE TERMUX APP DATA DIRECTORY
+USE_ROOT=: # run this as root to avoid permission problems if using a path outside the termux app data path
+
+MNEMONIC_USER="" # put something in this string if you want user name to make sense and be an equivalent id to what the first user set up by the debian installer would be.
+USER_PASSWORD="" # put something in this to make the user have a password. POC
+
+[ ! $USER = root ] && USE_ROOT && {
+	pkg install -y tsu
+	tsu $0
+}
 
 ARCHITECTURE=$(uname -m)
 case $ARCHITECTURE in    # supported architectures include: armel, armhf, arm64, i386, amd64
@@ -18,9 +28,12 @@ case $ARCHITECTURE in    # supported architectures include: armel, armhf, arm64,
 	*) echo "Unsupported architecture $ARCHITECTURE"; exit ;;
 esac
 
-VERSION=stable             # supported debian versions include: stretch, stable, testing, unstable
-ROOTFS_TOP=deboot_debian   # name of the top install directory
-ZONEINFO=Europe/Berlin     # set your desired time zone
+DEBIAN_MIRROR=http://ftp.us.debian.net # mirror of debian to use for updates, CAN HAVE A MASSIVE EFFECT ON HOW LONG UPDATES AND THIS SCRIPT TAKE, google which one is nearest to you if you are unsure.
+VERSION=testing             # supported debian versions include: stretch, stable, testing, unstable
+ROOTFS_TOP=Debian   # name of the top install directory
+ZONEINFO=US/Central     # set your desired time zone
+
+# End of configurables
 
 filter() {
     grep -Ev '^$|^WARNING: apt does'
@@ -31,14 +44,21 @@ fallback() {
 	cd ..
 	rm -rf debootstrap
 	V=debootstrap-1.0.95
+	# NOTE: leaving line below as it is for now as I am not yet familiar with this mysterious feature
 	wget https://github.com/sp4rkie/debian-on-termux/files/1991333/$V.tgz.zip -O - | tar xfz -
 	V=$(echo "$V" | sed 's/_/-/g')
 	ln -nfs $V debootstrap
 	cd debootstrap
 }
 
-USER_ID=$(id -u)
-USER_NAME=$(id -un)
+[ ! $USER_ID = 0 ] && [ $MNEMONIC_USER == "" ] && USER_ID=$(id -u)
+[ ! $USER_NAME = root ] && [ $MNEMONIC_USER == "" ] USER_NAME=$(id -un)
+
+$MNEMONIC_USER && {
+	$USER_ID=1000	# that is what debian set up as the first user when I installed on my computer so just assuming it should do the same for the chroot
+	$USER_NAME=$MNEMONIC_USER
+}
+
 unset LD_PRELOAD # just in case termux-exec is installed
 #
 # workaround https://github.com/termux/termux-app/issues/306
@@ -52,10 +72,11 @@ cd
 # first stage - do the initial unpack phase of bootstrapping only
 #
 $DO_FIRST_STAGE && {
-[ -e "$HOME/$ROOTFS_TOP" ] && {
-    echo the target install directory already exists, to continue please remove it by
-    echo rm -rf "$HOME/$ROOTFS_TOP"
-    exit
+[ -e "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP" ] && {
+	# Changed as this can be incredibly useful and save 30 minutes if you accidently misconfigure everything or make the script fail
+    echo the target install directory already exists, If fixing the installation is undesirable stop the process and run
+    echo rm -rf "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP"
+    # exit
 }
 apt update 2>&1 | filter
 
@@ -67,8 +88,8 @@ unset RESOLV
 DEBIAN_FRONTEND=noninteractive apt -y install coreutils perl proot sed wget $RESOLV 2>&1 | filter
 hash -r
 rm -rf debootstrap
-V=$(wget http://http.debian.net/debian/pool/main/d/debootstrap/ -qO - | sed 's/<[^>]*>//g' | grep -E '\.[0-9]+\.tar\.gz' | tail -n 1 | sed 's/^ +//g;s/.tar.gz.*//g')
-wget "http://http.debian.net/debian/pool/main/d/debootstrap/$V.tar.gz" -O - | tar xfz -
+V=$(wget $DEBIAN_MIRROR/debian/pool/main/d/debootstrap/ -qO - | sed 's/<[^>]*>//g' | grep -E '\.[0-9]+\.tar\.gz' | tail -n 1 | sed 's/^ +//g;s/.tar.gz.*//g')
+wget "$DEBIAN_MIRROR/debian/pool/main/d/debootstrap/$V.tar.gz" -O - | tar xfz -
 V=$(echo $V | sed 's/_/-/g')
 ln -nfs "$V" debootstrap
 cd debootstrap
@@ -103,7 +124,7 @@ patch << 'EOF' || fallback
 EOF
 #
 # you can watch the debootstrap progress via
-# tail -F $HOME/$ROOTFS_TOP/debootstrap/debootstrap.log
+# tail -F $DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/debootstrap/debootstrap.log
 #
 export DEBOOTSTRAP_DIR=$(pwd)
 "$PREFIX/bin/proot" \
@@ -121,7 +142,7 @@ export DEBOOTSTRAP_DIR=$(pwd)
     -r "$PREFIX/.." \
     -0 \
     --link2symlink \
-    ./debootstrap --foreign --arch="$ARCHITECTURE" "$VERSION" "$HOME/$ROOTFS_TOP" \
+    ./debootstrap --foreign --arch="$ARCHITECTURE" "$VERSION" "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP" \
                                                                 || : # proot returns invalid exit status
 } # end DO_FIRST_STAGE
 
@@ -139,7 +160,7 @@ $DO_SECOND_STAGE && {
 "$PREFIX/bin/proot" \
     -b /dev \
     -b /proc \
-    -r "$HOME/$ROOTFS_TOP" \
+    -r "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP" \
     -w /root \
     -0 \
     --link2symlink \
@@ -150,17 +171,17 @@ $DO_SECOND_STAGE && {
 # Add termux user in the passwd, group and shadow.
 #
 echo "$USER_NAME:x:$USER_ID:$USER_ID::/home/$USER_NAME:/bin/bash" >> \
-    $HOME/$ROOTFS_TOP/etc/passwd
+    $DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/etc/passwd
 echo "$USER_NAME:x:$USER_ID:" >> \
-    $HOME/$ROOTFS_TOP/etc/group
+    $DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/etc/group
 echo "$USER_NAME:*:15277:0:99999:7:::" >> \
-    $HOME/$ROOTFS_TOP/etc/shadow
+    $DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/etc/shadow
 
 #
 # add the termux user homedir to the new debian guest system
 #
-mkdir -p "$HOME/$ROOTFS_TOP/home/$USER_NAME"
-chmod 755 "$HOME/$ROOTFS_TOP/home/$USER_NAME"
+mkdir -p "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/home/$USER_NAME"
+chmod 755 "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/home/$USER_NAME"
 } # end DO_SECOND_STAGE
 
 #
@@ -172,16 +193,15 @@ $DO_THIRD_STAGE && {
 #
 # take over an existing 'resolv.conf' from the host system (if there is one)
 #
-[ -e "$HOME/$ROOTFS_TOP/etc/resolv.conf" ] || {
-    cp "$PREFIX/etc/resolv.conf" "$HOME/$ROOTFS_TOP/etc/resolv.conf"
-    chmod 644 "$HOME/$ROOTFS_TOP/etc/resolv.conf"
+[ -e "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/etc/resolv.conf" ] || {
+    cp "$PREFIX/etc/resolv.conf" "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/etc/resolv.conf"
+    chmod 644 "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/etc/resolv.conf"
 }
 
 #
 # to enter the debian guest system execute '$HOME/bin/enter_deb' on the termux host system
 #
-mkdir -p "$HOME/bin"
-cat << EOF > "$HOME/bin/enter_deb"
+cat << EOF > "$HOME/../usr/bin/enter_deb"
 #!/data/data/com.termux/files/usr/bin/sh
 
 unset LD_PRELOAD
@@ -190,7 +210,7 @@ ROOTFS_TOP_=$ROOTFS_TOP
 ROOT_=1
 USER_=$USER_NAME
 EOF
-cat << 'EOF' >> "$HOME/bin/enter_deb"
+cat << 'EOF' >> "$HOME/../usr/bin/enter_deb"
 
 SCRIPTNAME=enter_deb
 show_usage () {
@@ -225,15 +245,15 @@ CMD_="$SHELL_ -l"
 eval $PREFIX/bin/proot \
     -b /dev \
     -b /proc \
-    -r $HOME/$ROOTFS_TOP_ \
+    -r $DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP_ \
     -w $HOMEDIR_ \
     $CAPS_ \
     --link2symlink \
     /usr/bin/env -i HOME=$HOMEDIR_ TERM=$TERM LANG=$LANG $CMD_
 EOF
-chmod 755 "$HOME/bin/enter_deb"
+chmod 755 "$HOME/../usr/bin/enter_deb"
 
-cat << 'EOF' > "$HOME/$ROOTFS_TOP/root/.profile"
+cat << 'EOF' > "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/root/.profile"
 # ~/.profile: executed by Bourne-compatible login shells.
 
 if [ "$BASH" ]; then
@@ -243,7 +263,7 @@ if [ "$BASH" ]; then
 fi
 EOF
 
-cat << EOF > "$HOME/$ROOTFS_TOP/tmp/dot_tmp.sh"
+cat << EOF > "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/tmp/dot_tmp.sh"
 #!/bin/sh
 
 filter() {
@@ -279,12 +299,12 @@ update-locale LANG=en_US.UTF-8 LC_COLLATE=C
 #DEBIAN_FRONTEND=noninteractive apt -y install rsync less gawk ssh 2>&1 | filter  
 apt clean 2>&1 | filter
 EOF
-chmod 755 "$HOME/$ROOTFS_TOP/tmp/dot_tmp.sh"
+chmod 755 "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/tmp/dot_tmp.sh"
 
 "$PREFIX/bin/proot" \
     -b /dev \
     -b /proc \
-    -r "$HOME/$ROOTFS_TOP" \
+    -r "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP" \
     -w /root \
     -0 \
     --link2symlink \
@@ -293,7 +313,7 @@ chmod 755 "$HOME/$ROOTFS_TOP/tmp/dot_tmp.sh"
 echo 
 echo installation successfully completed
 echo to enter the guest system type:
-echo "\$HOME/bin/enter_deb"
+echo "enter_deb"
 echo
 
 } # end DO_THIRD_STAGE
