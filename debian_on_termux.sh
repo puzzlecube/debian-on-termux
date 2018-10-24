@@ -10,7 +10,7 @@ DO_SECOND_STAGE=: # false  # required (complete the install/ executes inside gue
 DO_THIRD_STAGE=: # false   # optional (enable local policies/ executes inside guest invironment)
 DEBIAN_ROOT_INSTALLPATH=$HOME # IF YOU ARE NOT ROOTED DON'T SET THIS OUTSIDE OF THE TERMUX APP DATA DIRECTORY
 USE_ROOT=: # run this as root to avoid permission problems if using a path outside the termux app data path
-/
+
 MNEMONIC_USER="" # put something in this string if you want user name to make sense and be an equivalent id to what the first user set up by the debian installer would be.
 USER_PASSWORD="" # put something in this to make the user have a password. POC
 
@@ -28,7 +28,7 @@ case $ARCHITECTURE in    # supported architectures include: armel, armhf, arm64,
 	*) echo "Unsupported architecture $ARCHITECTURE"; exit ;;
 esac
 
-DEBIAN_MIRROR=http://ftp.us.debian.net # mirror of debian to use for updates, CAN HAVE A MASSIVE EFFECT ON HOW LONG UPDATES AND THIS SCRIPT TAKE, google which one is nearest to you if you are unsure.
+DEBIAN_MIRROR=http://ftp.us.debian.org # mirror of debian to use for updates, CAN HAVE A MASSIVE EFFECT ON HOW LONG UPDATES AND THIS SCRIPT TAKE, google which one is nearest to you if you are unsure.
 VERSION=testing             # supported debian versions include: stretch, stable, testing, unstable
 ROOTFS_TOP=Debian   # name of the top install directory
 ZONEINFO=US/Central     # set your desired time zone
@@ -55,8 +55,8 @@ fallback() {
 [ ! $USER_NAME = root ] && [ $MNEMONIC_USER == "" ] USER_NAME=$(id -un)
 
 [ ! $MNEMONIC_USER = "" ] && {
-	$USER_ID=1000	# that is what debian set up as the first user when I installed on my computer so just assuming it should do the same for the chroot
-	$USER_NAME=$MNEMONIC_USER
+	export USER_ID=1000	# that is what debian set up as the first user when I installed on my computer so just assuming it should do the same for the chroot
+	export USER_NAME=$MNEMONIC_USER
 }
 
 unset LD_PRELOAD # just in case termux-exec is installed
