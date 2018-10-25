@@ -15,8 +15,8 @@ MNEMONIC_USER="" # put something in this string if you want user name to make se
 USER_PASSWORD="" # put something in this to make the user have a password. POC
 
 [ ! $USER = root ] && USE_ROOT && {
-	pkg install -y tsu
-	tsu $0
+	pkg install tsu
+	tsu -c $0
 }
 
 ARCHITECTURE=$(uname -m)
@@ -51,8 +51,8 @@ fallback() {
 	cd debootstrap
 }
 
-[ ! $USER_ID = 0 ] && [ $MNEMONIC_USER == "" ] && USER_ID=$(id -u)
-[ ! $USER_NAME = root ] && [ $MNEMONIC_USER == "" ] USER_NAME=$(id -un)
+[ ! $USER_ID = 0 ] && [ $MNEMONIC_USER = "" ] && USER_ID=$(id -u)
+[ ! $USER_NAME = root ] && [ $MNEMONIC_USER = "" ] USER_NAME=$(id -un)
 
 [ ! $MNEMONIC_USER = "" ] && {
 	export USER_ID=1000	# that is what debian set up as the first user when I installed on my computer so just assuming it should do the same for the chroot
