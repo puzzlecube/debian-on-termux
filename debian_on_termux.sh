@@ -87,7 +87,7 @@ unset RESOLV
     RESOLV=resolv-conf
 }
 
-DEBIAN_FRONTEND=noninteractive apt -y install coreutils perl proot sed wget git debian*-keyring $RESOLV 2>&1 | filter
+DEBIAN_FRONTEND=noninteractive apt -y --fix-missing --allow-untrusted install coreutils perl proot sed wget git debian*-keyring $RESOLV 2>&1 | filter
 hash -r
 rm -rf debootstrap
 V=$(wget $DEBIAN_MIRROR/debian/pool/main/d/debootstrap/ -qO - | sed 's/<[^>]*>//g' | grep -E '\.[0-9]+\.tar\.gz' | tail -n 1 | sed 's/^ +//g;s/.tar.gz.*//g')
@@ -141,7 +141,7 @@ export DEBOOTSTRAP_DIR=$(pwd)
     -b "$PREFIX/var:/var" \
     -b /dev \
     -b /proc \
-    -b /host-rootfs:/\
+    -b /:/host-rootfs\
     -r "$PREFIX/.." \
     -0 \
     --link2symlink \
@@ -214,6 +214,7 @@ cat << EOF > "$HOME/../usr/bin/enter_deb"
 unset LD_PRELOAD
 SHELL_=/bin/bash
 ROOTFS_TOP_=$ROOTFS_TOP
+DEBIAN_ROOT_INSTALLPATH_=$DEBIAN_ROOT_INSTALLPATH
 ROOT_=1
 USER_=$USER_NAME
 EOF
@@ -253,7 +254,7 @@ eval $PREFIX/bin/proot \
     -b /dev \
     -b /proc \
     -b /host-rootfs \
-    -r $DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP_ \
+    -r $DEBIAN_ROOT_INSTALLPATH_/$ROOTFS_TOP_ \
     -w $HOMEDIR_ \
     $CAPS_ \
     --link2symlink \
