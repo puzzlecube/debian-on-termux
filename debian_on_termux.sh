@@ -74,8 +74,10 @@ cd
 $DO_FIRST_STAGE && {
 [ -e "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP" ] && {
 	# Changed as this can be incredibly useful and save 30 minutes if you accidently misconfigure everything or make the script fail
-    echo the target install directory already exists, If fixing the installation is undesirable stop the process and run
-    echo rm -rf "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP"
+    echo "the target install directory already exists, If fixing the installation is undesirable stop the process and run"
+    echo "rm -rf '$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP'"
+    echo "Otherwise hit enter and the script will continue"
+    read pausescript
     # exit
 }
 apt update 2>&1 | filter
@@ -85,7 +87,7 @@ unset RESOLV
     RESOLV=resolv-conf
 }
 
-DEBIAN_FRONTEND=noninteractive apt -y install coreutils perl proot sed wget $RESOLV 2>&1 | filter
+DEBIAN_FRONTEND=noninteractive apt -y install coreutils perl proot sed wget git debian*-keyring $RESOLV 2>&1 | filter
 hash -r
 rm -rf debootstrap
 V=$(wget $DEBIAN_MIRROR/debian/pool/main/d/debootstrap/ -qO - | sed 's/<[^>]*>//g' | grep -E '\.[0-9]+\.tar\.gz' | tail -n 1 | sed 's/^ +//g;s/.tar.gz.*//g')
@@ -139,6 +141,7 @@ export DEBOOTSTRAP_DIR=$(pwd)
     -b "$PREFIX/var:/var" \
     -b /dev \
     -b /proc \
+    -b /host-rootfs:/\
     -r "$PREFIX/.." \
     -0 \
     --link2symlink \
@@ -157,9 +160,12 @@ $DO_SECOND_STAGE && {
 # UPDATE as of 2017_11_27:
 # issue https://github.com/termux/termux-packages/issues/1679#ref-commit-bcc972c now got fixed.
 # /proc now included in mount list
+# UPDATE as of 2019_2_22:
+# Host filesystem now mounted as /host-rootfs with name consistant with UserLand's mountpoint of the host root filesystem.
 "$PREFIX/bin/proot" \
     -b /dev \
     -b /proc \
+    -b /host-rootfs \
     -r "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP" \
     -w /root \
     -0 \
@@ -246,6 +252,7 @@ CMD_="$SHELL_ -l"
 eval $PREFIX/bin/proot \
     -b /dev \
     -b /proc \
+    -b /host-rootfs \
     -r $DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP_ \
     -w $HOMEDIR_ \
     $CAPS_ \
@@ -254,7 +261,7 @@ eval $PREFIX/bin/proot \
 EOF
 chmod 755 "$HOME/../usr/bin/enter_deb"
 
-cat << 'EOF' > "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/root/.profile"
+cat << 'EOF' > $DEBIAN_ROOT_INSTALLPATH"/$ROOTFS_TOP/root/.profile"
 # ~/.profile: executed by Bourne-compatible login shells.
 
 if [ "$BASH" ]; then
@@ -305,6 +312,7 @@ chmod 755 "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP/tmp/dot_tmp.sh"
 "$PREFIX/bin/proot" \
     -b /dev \
     -b /proc \
+    -b /host-rootfs \
     -r "$DEBIAN_ROOT_INSTALLPATH/$ROOTFS_TOP" \
     -w /root \
     -0 \

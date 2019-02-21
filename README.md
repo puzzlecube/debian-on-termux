@@ -28,7 +28,7 @@ how to use it
 - note replace $SOME_CLI_EDITOR with whatever text editor you want from termux
 	$SOME_CLI_EDITOR $* ~/debian-on-termux/debian-on-termux.sh
 
-- make sure the file is executable by termux with chmod
+- make sure the file is executable by termux with chmod (Git should take care of this for you)
 	chmod 0777 ~/debian-on-termux/debian-on-termux.sh
 
 - check the configuration lines near the top of the script for your target architecture, debian version and other preferences
@@ -49,7 +49,7 @@ how to use it
 
           -0 - mimic root (default)
           -n - prefer regular termux uid (termux-uid)
-	  -u - emulate a linux user with a username and password
+	  -u - emulate a linux user with a username and password (POC)
 
 - sample usage: debian shell (stay in chrooted debian)
         
@@ -65,7 +65,7 @@ how to use it
         9.1
         bash-4.4$
 
-- for suggestions or in the unlikely event of a problem just raise an issue [here](https://github.com/sp4rkie/debian-on-termux/issues/new):-)
+- for suggestions or in the likely event of a problem just raise an issue [here](https://github.com/puzzlecube/debian-on-termux/issues/new):-)
 
 alternatives
 --------
